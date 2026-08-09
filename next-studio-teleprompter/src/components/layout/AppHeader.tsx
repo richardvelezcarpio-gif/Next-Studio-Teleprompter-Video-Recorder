@@ -2,11 +2,13 @@ import { Link, NavLink } from 'react-router-dom'
 import { Button } from '../ui/Button'
 import type { useCamera } from '../../hooks/useCamera'
 import type { useMicrophone } from '../../hooks/useMicrophone'
+import type { useTeleprompter } from '../../hooks/useTeleprompter'
 
 type CameraController = ReturnType<typeof useCamera>
 type MicrophoneController = ReturnType<typeof useMicrophone>
+type Teleprompter = ReturnType<typeof useTeleprompter>
 
-export function AppHeader({ camera, microphone }: { camera: CameraController; microphone: MicrophoneController }) {
+export function AppHeader({ camera, microphone, script, teleprompter }: { camera: CameraController; microphone: MicrophoneController; script: string; teleprompter: Teleprompter }) {
   return (
     <header className="app-header">
       <Link to="/studio" className="brand" aria-label="Next Studio home">
@@ -27,7 +29,7 @@ export function AppHeader({ camera, microphone }: { camera: CameraController; mi
         <NavLink to="/settings" className="header-link">Settings</NavLink>
       </nav>
       <div className="header-cta">
-        <Button variant="primary">Start</Button>
+        <Button variant="primary" onClick={() => teleprompter.toggle(script)}>{teleprompter.status === 'running' ? 'Pause' : teleprompter.status === 'paused' ? 'Resume' : 'Start'}</Button>
         <Button variant="record"><span className="record-dot" />Record</Button>
       </div>
     </header>
