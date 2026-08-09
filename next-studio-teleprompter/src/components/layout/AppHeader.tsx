@@ -1,0 +1,28 @@
+import { Link, NavLink } from 'react-router-dom'
+import { Button } from '../ui/Button'
+
+export function AppHeader() {
+  return (
+    <header className="app-header">
+      <Link to="/studio" className="brand" aria-label="Next Studio home">
+        {/* The supplied original logo belongs at src/assets/branding/next-studio-logo.png. */}
+        <span className="brand-logo-slot" aria-label="Next Studio logo" role="img" />
+        <span><strong>Next Studio</strong><small>Teleprompter Video Recorder</small></span>
+      </Link>
+      <nav className="header-actions" aria-label="Primary actions">
+        <Link to="/scripts/new" className="header-link">New Script</Link>
+        <NavLink to="/scripts" className="header-link">Open</NavLink>
+        <button className="header-link" type="button">Save</button>
+      </nav>
+      <nav className="header-settings" aria-label="Studio settings">
+        <NavLink to="/settings/video" className="header-link">Camera</NavLink>
+        <NavLink to="/settings/audio" className="header-link">Mic</NavLink>
+        <NavLink to="/settings" className="header-link">Settings</NavLink>
+      </nav>
+      <div className="header-cta">
+        <Button variant="primary">Start</Button>
+        <Button variant="record"><span className="record-dot" />Record</Button>
+      </div>
+    </header>
+  )
+}
