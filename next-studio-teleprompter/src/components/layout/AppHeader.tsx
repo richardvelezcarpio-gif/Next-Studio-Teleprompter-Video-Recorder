@@ -1,10 +1,12 @@
 import { Link, NavLink } from 'react-router-dom'
 import { Button } from '../ui/Button'
 import type { useCamera } from '../../hooks/useCamera'
+import type { useMicrophone } from '../../hooks/useMicrophone'
 
 type CameraController = ReturnType<typeof useCamera>
+type MicrophoneController = ReturnType<typeof useMicrophone>
 
-export function AppHeader({ camera }: { camera: CameraController }) {
+export function AppHeader({ camera, microphone }: { camera: CameraController; microphone: MicrophoneController }) {
   return (
     <header className="app-header">
       <Link to="/studio" className="brand" aria-label="Next Studio home">
@@ -20,7 +22,8 @@ export function AppHeader({ camera }: { camera: CameraController }) {
       <nav className="header-settings" aria-label="Studio settings">
         <button className="header-link" type="button" onClick={() => camera.stream ? camera.stopCamera() : camera.startCamera()}>{camera.stream ? 'Camera On' : 'Camera'}</button>
         {camera.stream && camera.cameras.length > 1 && <label className="header-camera-select"><span className="sr-only">Select camera</span><select value={camera.selectedDeviceId} onChange={(event) => camera.selectCamera(event.target.value)}>{camera.cameras.map((device, index) => <option key={device.deviceId} value={device.deviceId}>{device.label || `Camera ${index + 1}`}</option>)}</select></label>}
-        <NavLink to="/settings/audio" className="header-link">Mic</NavLink>
+        <button className="header-link" type="button" onClick={() => microphone.isActive ? microphone.stopMicrophone() : microphone.startMicrophone()}>{microphone.isActive ? 'Mic On' : 'Mic Off'}</button>
+        {microphone.isActive && microphone.microphones.length > 1 && <label className="header-camera-select"><span className="sr-only">Select microphone</span><select value={microphone.selectedDeviceId} onChange={(event) => microphone.selectMicrophone(event.target.value)}>{microphone.microphones.map((device, index) => <option key={device.deviceId} value={device.deviceId}>{device.label || `Microphone ${index + 1}`}</option>)}</select></label>}
         <NavLink to="/settings" className="header-link">Settings</NavLink>
       </nav>
       <div className="header-cta">
