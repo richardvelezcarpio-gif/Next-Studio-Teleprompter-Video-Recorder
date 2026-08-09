@@ -4,6 +4,7 @@ import type { useCamera } from '../../hooks/useCamera'
 import type { useMicrophone } from '../../hooks/useMicrophone'
 import type { useTeleprompter } from '../../hooks/useTeleprompter'
 import type { useRecorder } from '../../hooks/useRecorder'
+import nextStudioLogo from '../../assets/branding/next-studio-logo.png'
 
 type CameraController = ReturnType<typeof useCamera>
 type MicrophoneController = ReturnType<typeof useMicrophone>
@@ -15,8 +16,7 @@ export function AppHeader({ camera, microphone, script, teleprompter, recorder, 
   return (
     <header className="app-header">
       <Link to="/studio" className="brand" aria-label="Next Studio home">
-        {/* The supplied original logo belongs at src/assets/branding/next-studio-logo.png. */}
-        <span className="brand-logo-slot" aria-label="Next Studio logo" role="img" />
+        <img className="brand-logo" src={nextStudioLogo} alt="Next Studio" />
         <span><strong>Next Studio</strong><small>Teleprompter Video Recorder</small></span>
       </Link>
       <nav className="header-actions" aria-label="Primary actions">
