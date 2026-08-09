@@ -1,4 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { LandingPage } from '../pages/LandingPage'
 import { AppLayout } from '../components/layout/AppLayout'
 import { HelpPage } from '../pages/HelpPage'
 import { StudioPage } from '../pages/StudioPage'
@@ -17,7 +18,7 @@ export function AppRouter() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Navigate to="/studio" replace />} />
+        <Route path="/" element={<LandingPage />} />
         <Route element={<AppLayout />}>
           <Route path="/studio" element={<StudioPage />} />
           <Route path="/scripts" element={<ScriptsPage />} />
