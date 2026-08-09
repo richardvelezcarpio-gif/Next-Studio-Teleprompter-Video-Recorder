@@ -1,4 +1,4 @@
-import { Link, NavLink } from 'react-router-dom'
+import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { Button } from '../ui/Button'
 import type { useCamera } from '../../hooks/useCamera'
 import type { useMicrophone } from '../../hooks/useMicrophone'
@@ -10,7 +10,8 @@ type MicrophoneController = ReturnType<typeof useMicrophone>
 type Teleprompter = ReturnType<typeof useTeleprompter>
 type Recorder = ReturnType<typeof useRecorder>
 
-export function AppHeader({ camera, microphone, script, teleprompter, recorder }: { camera: CameraController; microphone: MicrophoneController; script: string; teleprompter: Teleprompter; recorder: Recorder }) {
+export function AppHeader({ camera, microphone, script, teleprompter, recorder, onSave, onNew }: { camera: CameraController; microphone: MicrophoneController; script: string; teleprompter: Teleprompter; recorder: Recorder; onSave: () => void; onNew: () => boolean }) {
+  const navigate = useNavigate()
   return (
     <header className="app-header">
       <Link to="/studio" className="brand" aria-label="Next Studio home">
@@ -19,9 +20,9 @@ export function AppHeader({ camera, microphone, script, teleprompter, recorder }
         <span><strong>Next Studio</strong><small>Teleprompter Video Recorder</small></span>
       </Link>
       <nav className="header-actions" aria-label="Primary actions">
-        <Link to="/scripts/new" className="header-link">New Script</Link>
+        <button className="header-link" type="button" onClick={() => { if (onNew()) navigate('/studio') }}>New Script</button>
         <NavLink to="/scripts" className="header-link">Open</NavLink>
-        <button className="header-link" type="button">Save</button>
+        <button className="header-link" type="button" onClick={onSave}>Save</button>
       </nav>
       <nav className="header-settings" aria-label="Studio settings">
         <button className="header-link" type="button" disabled={recorder.isRecording} onClick={() => camera.stream ? camera.stopCamera() : camera.startCamera()}>{camera.stream ? 'Camera On' : 'Camera'}</button>

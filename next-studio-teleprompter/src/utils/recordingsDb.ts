@@ -6,7 +6,7 @@ const storeName = 'recordings'
 function openDatabase(): Promise<IDBDatabase> {
   if (!('indexedDB' in window)) return Promise.reject(new Error('IndexedDB unavailable'))
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(databaseName, 1)
+    const request = indexedDB.open(databaseName, 2)
     request.onupgradeneeded = () => {
       if (!request.result.objectStoreNames.contains(storeName)) request.result.createObjectStore(storeName, { keyPath: 'id' })
     }
