@@ -15,7 +15,9 @@ export function useRecorder() {
   const [status, setStatus] = useState<RecorderStatus>('ready')
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [recordedUrl, setRecordedUrl] = useState<string | null>(null)
+  const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null)
   const [mimeType, setMimeType] = useState('video/webm')
+  const [hasAudio, setHasAudio] = useState(false)
   const [error, setError] = useState('')
 
   const clearTimer = useCallback(() => {
@@ -30,6 +32,7 @@ export function useRecorder() {
   }, [])
 
   const startRecording = useCallback((cameraStream: MediaStream | null, microphoneStream: MediaStream | null) => {
+    if (recorderRef.current?.state === 'recording') return
     if (!cameraStream?.getVideoTracks().length) {
       setError('Turn on your camera before recording.')
       setStatus('error')
@@ -43,12 +46,14 @@ export function useRecorder() {
     try {
       revokeUrl()
       chunksRef.current = []
+      setRecordedBlob(null)
       setElapsedSeconds(0)
       setError('')
       const recordingStream = new MediaStream([
         ...cameraStream.getVideoTracks(),
         ...(microphoneStream?.getAudioTracks() || []),
       ])
+      setHasAudio(Boolean(microphoneStream?.getAudioTracks().length))
       const preferredType = supportedMimeType()
       const recorder = preferredType ? new MediaRecorder(recordingStream, { mimeType: preferredType }) : new MediaRecorder(recordingStream)
       recorderRef.current = recorder
@@ -67,6 +72,7 @@ export function useRecorder() {
         const nextUrl = URL.createObjectURL(blob)
         urlRef.current = nextUrl
         setRecordedUrl(nextUrl)
+        setRecordedBlob(blob)
         setStatus('complete')
         recorderRef.current = null
       }
@@ -99,6 +105,7 @@ export function useRecorder() {
     clearTimer()
     revokeUrl()
     chunksRef.current = []
+    setRecordedBlob(null)
     setElapsedSeconds(0)
     setError('')
     setStatus('ready')
@@ -110,5 +117,5 @@ export function useRecorder() {
     if (urlRef.current) URL.revokeObjectURL(urlRef.current)
   }, [clearTimer])
 
-  return { status, elapsedSeconds, recordedUrl, mimeType, error, isRecording: status === 'recording', startRecording, stopRecording, resetRecording }
+  return { status, elapsedSeconds, recordedUrl, recordedBlob, mimeType, hasAudio, error, isRecording: status === 'recording', startRecording, stopRecording, resetRecording }
 }
