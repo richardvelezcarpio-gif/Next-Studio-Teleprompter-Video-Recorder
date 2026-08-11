@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { describeTrack, reportAudioDiagnostic } from '../utils/audioDiagnostics'
 
 type RecorderStatus = 'ready' | 'recording' | 'complete' | 'error'
 
@@ -38,11 +39,20 @@ export function useRecorder() {
     setRecordedUrl(null)
   }, [])
 
-  const startRecording = useCallback((cameraStream: MediaStream | null, microphoneStream: MediaStream | null) => {
+  const startRecording = useCallback((cameraStream: MediaStream | null, microphoneStream: MediaStream | null, requireAudio = false) => {
     if (recorderRef.current?.state === 'recording') return
-    if (!cameraStream?.getVideoTracks().length) {
+    const videoTracks = cameraStream?.getVideoTracks() || []
+    const audioTracks = microphoneStream?.getAudioTracks() || []
+    if (!videoTracks.length) {
       setError('Turn on your camera before recording.')
       setStatus('error')
+      reportAudioDiagnostic({ error: 'MediaRecorder: camera stream has no video track' })
+      return
+    }
+    if (requireAudio && !audioTracks.length) {
+      setError('Allow microphone access before recording on mobile.')
+      setStatus('error')
+      reportAudioDiagnostic({ error: 'MediaRecorder: microphone stream has no audio track' })
       return
     }
     if (typeof MediaRecorder === 'undefined') {
@@ -56,16 +66,64 @@ export function useRecorder() {
       setRecordedBlob(null)
       setElapsedSeconds(0)
       setError('')
-      const recordingStream = new MediaStream([
-        ...cameraStream.getVideoTracks(),
-        ...(microphoneStream?.getAudioTracks() || []),
+      const recorderStream = new MediaStream([
+        ...videoTracks,
+        ...audioTracks,
       ])
-      setHasAudio(Boolean(microphoneStream?.getAudioTracks().length))
+      setHasAudio(Boolean(audioTracks.length))
       const preferredType = supportedMimeType()
-      const recorder = preferredType ? new MediaRecorder(recordingStream, { mimeType: preferredType }) : new MediaRecorder(recordingStream)
+      console.log('FINAL RECORDER STREAM', recorderStream)
+      console.log('FINAL AUDIO TRACKS', recorderStream.getAudioTracks().map((track) => ({
+        id: track.id,
+        label: track.label,
+        enabled: track.enabled,
+        muted: track.muted,
+        readyState: track.readyState,
+        settings: track.getSettings?.(),
+      })))
+      console.log('FINAL VIDEO TRACKS', recorderStream.getVideoTracks().map((track) => ({
+        id: track.id,
+        label: track.label,
+        enabled: track.enabled,
+        muted: track.muted,
+        readyState: track.readyState,
+      })))
+      console.log('MIC TRACK IN RECORDER STREAM', {
+        sourceTrackIds: audioTracks.map((track) => track.id),
+        recorderTrackIds: recorderStream.getAudioTracks().map((track) => track.id),
+        sameTrack: audioTracks.every((track) => recorderStream.getAudioTracks().some((recorderTrack) => recorderTrack.id === track.id)),
+      })
+      reportAudioDiagnostic({
+        recorderAudioTracks: recorderStream.getAudioTracks().map(describeTrack),
+        recorderVideoTracks: recorderStream.getVideoTracks().map(describeTrack),
+        sameTrack: audioTracks.length ? audioTracks.every((track) => recorderStream.getAudioTracks().some((recorderTrack) => recorderTrack.id === track.id)) : false,
+        error: '',
+      })
+      console.log('MEDIARECORDER MIME SUPPORT', {
+        mp4AvcAac: MediaRecorder.isTypeSupported('video/mp4;codecs=avc1.42E01E,mp4a.40.2'),
+        mp4: MediaRecorder.isTypeSupported('video/mp4'),
+        webmVp8Opus: MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus'),
+        webm: MediaRecorder.isTypeSupported('video/webm'),
+        preferredType,
+      })
+      const recorder = preferredType ? new MediaRecorder(recorderStream, { mimeType: preferredType }) : new MediaRecorder(recorderStream)
       recorderRef.current = recorder
       setMimeType(recorder.mimeType || preferredType || 'video/webm')
+      reportAudioDiagnostic({ mimeType: recorder.mimeType || preferredType || 'video/webm' })
+      console.info('[Next Studio recorder diagnostic]', {
+        browser: navigator.userAgent,
+        videoTracks: recorderStream.getVideoTracks().length,
+        audioTracks: recorderStream.getAudioTracks().length,
+        audioTrack: recorderStream.getAudioTracks()[0] && {
+          readyState: recorderStream.getAudioTracks()[0].readyState,
+          enabled: recorderStream.getAudioTracks()[0].enabled,
+          muted: recorderStream.getAudioTracks()[0].muted,
+        },
+        mimeType: recorder.mimeType || preferredType || 'video/webm',
+      })
       recorder.ondataavailable = (event) => {
+        console.log('MEDIARECORDER DATA AVAILABLE', { size: event.data.size, type: event.data.type })
+        reportAudioDiagnostic({ lastBlob: { size: event.data.size, type: event.data.type } })
         if (event.data.size > 0) chunksRef.current.push(event.data)
       }
       recorder.onstop = () => {
@@ -87,14 +145,16 @@ export function useRecorder() {
         clearTimer()
         setError('Unable to record video.')
         setStatus('error')
+        reportAudioDiagnostic({ error: 'MediaRecorder: unable to record video' })
         recorderRef.current = null
       }
       recorder.start(250)
       setStatus('recording')
       timerRef.current = window.setInterval(() => setElapsedSeconds((seconds) => seconds + 1), 1000)
-    } catch {
+    } catch (recordingError) {
       setError('Unable to start recording.')
       setStatus('error')
+      reportAudioDiagnostic({ error: `MediaRecorder: ${String(recordingError)}` })
     }
   }, [clearTimer, revokeUrl])
 
