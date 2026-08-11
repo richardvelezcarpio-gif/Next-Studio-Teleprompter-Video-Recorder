@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 type Language = 'en' | 'es'
 
@@ -20,8 +20,8 @@ const content = {
   es: {
     floating: 'Chatea con nosotros',
     heading: '¿Quieres tu propia plataforma para tu negocio?',
-    message: 'Podemos crear una solución digital personalizada para ti.',
-    action: 'Hablar por WhatsApp',
+    message: 'Podemos crear una solución digital personalizada para tu negocio.',
+    action: 'Chatea por WhatsApp',
     prefilledMessage: 'Hola Richard, vi la plataforma Next Studio Teleprompter Video Recorder y estoy interesado en crear una plataforma personalizada para mi negocio.',
   },
 }
@@ -30,6 +30,17 @@ export function WhatsAppWidget({ language, photoSrc }: WhatsAppWidgetProps) {
   const [isOpen, setIsOpen] = useState(false)
   const t = content[language]
   const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(t.prefilledMessage)}`
+
+  useEffect(() => {
+    if (sessionStorage.getItem('nextStudioWhatsAppAutoOpened')) return
+
+    const timeoutId = window.setTimeout(() => {
+      setIsOpen(true)
+      sessionStorage.setItem('nextStudioWhatsAppAutoOpened', 'true')
+    }, 3000)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [])
 
   return (
     <div className="whatsapp-widget">

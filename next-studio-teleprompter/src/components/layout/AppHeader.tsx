@@ -13,6 +13,7 @@ type Recorder = ReturnType<typeof useRecorder>
 
 export function AppHeader({ camera, microphone, script, teleprompter, recorder, onSave, onNew }: { camera: CameraController; microphone: MicrophoneController; script: string; teleprompter: Teleprompter; recorder: Recorder; onSave: () => void; onNew: () => boolean }) {
   const navigate = useNavigate()
+  const nextStudioToolsLabel = localStorage.getItem('nextStudioLanguage') === 'es' ? 'Más herramientas de Next Studio ↗' : 'More Next Studio Tools ↗'
   return (
     <header className="app-header">
       <Link to="/studio" className="brand" aria-label="Next Studio home">
@@ -30,6 +31,7 @@ export function AppHeader({ camera, microphone, script, teleprompter, recorder, 
         <button className="header-link" type="button" disabled={recorder.isRecording} onClick={() => microphone.isActive ? microphone.stopMicrophone() : microphone.startMicrophone()}>{microphone.isActive ? 'Mic On' : 'Mic Off'}</button>
         {microphone.isActive && microphone.microphones.length > 1 && <label className="header-camera-select"><span className="sr-only">Select microphone</span><select disabled={recorder.isRecording} value={microphone.selectedDeviceId} onChange={(event) => microphone.selectMicrophone(event.target.value)}>{microphone.microphones.map((device, index) => <option key={device.deviceId} value={device.deviceId}>{device.label || `Microphone ${index + 1}`}</option>)}</select></label>}
         <NavLink to="/settings" className="header-link">Settings</NavLink>
+        <a className="header-link header-next-studio" href="https://nextstudio.agency" target="_blank" rel="noopener noreferrer">{nextStudioToolsLabel}</a>
       </nav>
       <div className="header-cta">
         <Button variant="primary" onClick={() => teleprompter.toggle(script)}>{teleprompter.status === 'running' ? 'Pause' : teleprompter.status === 'paused' ? 'Resume' : 'Start'}</Button>
