@@ -14,6 +14,17 @@ type Recorder = ReturnType<typeof useRecorder>
 export function AppHeader({ camera, microphone, script, teleprompter, recorder, onSave, onNew }: { camera: CameraController; microphone: MicrophoneController; script: string; teleprompter: Teleprompter; recorder: Recorder; onSave: () => void; onNew: () => boolean }) {
   const navigate = useNavigate()
   const nextStudioToolsLabel = localStorage.getItem('nextStudioLanguage') === 'es' ? 'Más herramientas de Next Studio ↗' : 'More Next Studio Tools ↗'
+  const isMobileBrowser = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
+  const handleRecording = async () => {
+    if (recorder.isRecording) {
+      recorder.stopRecording()
+      return
+    }
+    const microphoneStream = isMobileBrowser && !microphone.stream?.getAudioTracks().length
+      ? await microphone.startMicrophone()
+      : microphone.stream
+    recorder.startRecording(camera.stream, microphoneStream || null, isMobileBrowser)
+  }
   return (
     <header className="app-header">
       <Link to="/studio" className="brand" aria-label="Next Studio home">
@@ -35,7 +46,7 @@ export function AppHeader({ camera, microphone, script, teleprompter, recorder, 
       </nav>
       <div className="header-cta">
         <Button variant="primary" onClick={() => teleprompter.toggle(script)}>{teleprompter.status === 'running' ? 'Pause' : teleprompter.status === 'paused' ? 'Resume' : 'Start'}</Button>
-        <Button variant="record" onClick={() => recorder.isRecording ? recorder.stopRecording() : recorder.startRecording(camera.stream, microphone.stream)}><span className="record-dot" />{recorder.isRecording ? 'Stop' : 'Record'}</Button>
+        <Button variant="record" onClick={() => void handleRecording()}><span className="record-dot" />{recorder.isRecording ? 'Stop' : 'Record'}</Button>
       </div>
     </header>
   )

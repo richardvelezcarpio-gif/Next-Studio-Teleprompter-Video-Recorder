@@ -59,23 +59,35 @@ export function useMicrophone() {
   const startMicrophone = useCallback(async (deviceId?: string) => {
     if (!navigator.mediaDevices?.getUserMedia) {
       setError('Unable to access microphone.')
-      return
+      return null
     }
     setIsLoading(true)
     setError(null)
     stopMicrophone()
     try {
-      const nextStream = await navigator.mediaDevices.getUserMedia({
+      const constraints: MediaStreamConstraints = {
         audio: deviceId ? { deviceId: { exact: deviceId } } : true,
         video: false,
-      })
+      }
+      let nextStream: MediaStream
+      try {
+        nextStream = await navigator.mediaDevices.getUserMedia(constraints)
+      } catch (requestError) {
+        if (deviceId && requestError instanceof DOMException && ['NotFoundError', 'OverconstrainedError'].includes(requestError.name)) {
+          nextStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+        } else {
+          throw requestError
+        }
+      }
       streamRef.current = nextStream
       setStream(nextStream)
       startLevelMeter(nextStream)
       const activeDeviceId = nextStream.getAudioTracks()[0]?.getSettings().deviceId
       await refreshMicrophones(activeDeviceId || deviceId)
+      return nextStream
     } catch (microphoneError) {
       setError(messageFor(microphoneError))
+      return null
     } finally {
       setIsLoading(false)
     }

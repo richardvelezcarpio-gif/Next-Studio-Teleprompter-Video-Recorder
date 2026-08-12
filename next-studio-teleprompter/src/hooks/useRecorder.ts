@@ -38,10 +38,17 @@ export function useRecorder() {
     setRecordedUrl(null)
   }, [])
 
-  const startRecording = useCallback((cameraStream: MediaStream | null, microphoneStream: MediaStream | null) => {
+  const startRecording = useCallback((cameraStream: MediaStream | null, microphoneStream: MediaStream | null, requireAudio = false) => {
     if (recorderRef.current?.state === 'recording') return
-    if (!cameraStream?.getVideoTracks().length) {
+    const videoTracks = cameraStream?.getVideoTracks() || []
+    const audioTracks = microphoneStream?.getAudioTracks() || []
+    if (!videoTracks.length) {
       setError('Turn on your camera before recording.')
+      setStatus('error')
+      return
+    }
+    if (requireAudio && !audioTracks.length) {
+      setError('Allow microphone access before recording on mobile.')
       setStatus('error')
       return
     }
@@ -56,13 +63,13 @@ export function useRecorder() {
       setRecordedBlob(null)
       setElapsedSeconds(0)
       setError('')
-      const recordingStream = new MediaStream([
-        ...cameraStream.getVideoTracks(),
-        ...(microphoneStream?.getAudioTracks() || []),
+      const recorderStream = new MediaStream([
+        ...videoTracks,
+        ...audioTracks,
       ])
-      setHasAudio(Boolean(microphoneStream?.getAudioTracks().length))
+      setHasAudio(Boolean(audioTracks.length))
       const preferredType = supportedMimeType()
-      const recorder = preferredType ? new MediaRecorder(recordingStream, { mimeType: preferredType }) : new MediaRecorder(recordingStream)
+      const recorder = preferredType ? new MediaRecorder(recorderStream, { mimeType: preferredType }) : new MediaRecorder(recorderStream)
       recorderRef.current = recorder
       setMimeType(recorder.mimeType || preferredType || 'video/webm')
       recorder.ondataavailable = (event) => {
