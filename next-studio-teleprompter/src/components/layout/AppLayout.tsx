@@ -4,6 +4,7 @@ import { useCamera } from '../../hooks/useCamera'
 import { useMicrophone } from '../../hooks/useMicrophone'
 import { useTeleprompter } from '../../hooks/useTeleprompter'
 import { useRecorder } from '../../hooks/useRecorder'
+import { useStudioAudio } from '../../hooks/useStudioAudio'
 import { AppHeader } from './AppHeader'
 import { createScript, updateScript } from '../../utils/scriptsDb'
 
@@ -12,6 +13,7 @@ export function AppLayout() {
   const microphone = useMicrophone()
   const teleprompter = useTeleprompter()
   const recorder = useRecorder()
+  const studioAudio = useStudioAudio()
   const [script, setScript] = useState('')
   const [scriptId, setScriptId] = useState<string | null>(null)
   const [scriptTitle, setScriptTitle] = useState('')
@@ -21,9 +23,11 @@ export function AppLayout() {
   const { stopMicrophone } = microphone
   const { pause } = teleprompter
   const { stopRecording } = recorder
+  const { stopRecordingMix } = studioAudio
   const handleProcessedStream = useCallback((stream: MediaStream | null, active: boolean) => setProcessedVideo({ stream, active }), [])
   const handleRecording = async () => {
     if (recorder.isRecording) {
+      stopRecordingMix()
       recorder.stopRecording()
       return
     }
@@ -32,7 +36,13 @@ export function AppLayout() {
       ? await microphone.startMicrophone()
       : microphone.stream
     if (processedVideo.active && !processedVideo.stream) return
-    recorder.startRecording(processedVideo.active ? processedVideo.stream : camera.stream, microphoneStream || null, isMobileBrowser)
+    const recordingVideo = processedVideo.active ? processedVideo.stream : camera.stream
+    if (!recordingVideo?.getVideoTracks().length) {
+      recorder.startRecording(recordingVideo, microphoneStream || null, isMobileBrowser)
+      return
+    }
+    const recordingAudio = studioAudio.hasAudio ? await studioAudio.startRecordingMix(microphoneStream || null) : microphoneStream
+    recorder.startRecording(recordingVideo, recordingAudio || null, isMobileBrowser)
   }
 
   useEffect(() => {
@@ -53,14 +63,15 @@ export function AppLayout() {
       stopCamera()
       stopMicrophone()
       stopRecording()
+      stopRecordingMix()
       pause()
     }
-  }, [location.pathname, pause, stopCamera, stopMicrophone, stopRecording])
+  }, [location.pathname, pause, stopCamera, stopMicrophone, stopRecording, stopRecordingMix])
 
   return (
     <div className="app-shell">
       <AppHeader camera={camera} microphone={microphone} script={script} teleprompter={teleprompter} recorder={recorder} processedVideo={processedVideo} onToggleRecording={handleRecording} onSave={() => void saveScript()} onNew={newScript} />
-      <main className="app-main"><Outlet context={{ camera, microphone, script, setScript, scriptTitle, teleprompter, recorder, onProcessedStream: handleProcessedStream, onToggleRecording: handleRecording, processedVideo }} /></main>
+      <main className="app-main"><Outlet context={{ camera, microphone, studioAudio, script, setScript, scriptTitle, teleprompter, recorder, onProcessedStream: handleProcessedStream, onToggleRecording: handleRecording, processedVideo }} /></main>
     </div>
   )
 }
