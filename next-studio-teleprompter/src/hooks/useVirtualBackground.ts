@@ -140,13 +140,13 @@ export function useVirtualBackground({
   const lastFrameRef = useRef(0)
   const effectsRef = useRef(effects)
   effectsRef.current = effects
-  const processingActive = background.type !== 'original' || (effects.retouchEnabled && (effects.smoothing > 0 || effects.faceBrightness !== 0 || effects.skinTone !== 0)) || effects.brightness !== 100 || effects.contrast !== 100 || effects.saturation !== 100 || effects.temperature !== 0 || (effects.textVisible && Boolean(effects.text.trim())) || effects.captionEnabled
+  const needsCanvasComposition = background.type !== 'original' || (effects.retouchEnabled && (effects.smoothing > 0 || effects.faceBrightness !== 0 || effects.skinTone !== 0)) || effects.brightness !== 100 || effects.contrast !== 100 || effects.saturation !== 100 || effects.temperature !== 0 || (effects.textVisible && Boolean(effects.text.trim())) || effects.captionEnabled
 
   useEffect(() => {
     const initialEffects = effectsRef.current
     const hasRetouch = initialEffects.retouchEnabled && (initialEffects.smoothing > 0 || initialEffects.faceBrightness !== 0 || initialEffects.skinTone !== 0)
     const needsSegmentation = background.type !== 'original'
-    const active = processingActive
+    const active = needsCanvasComposition
     const video = videoRef.current
     const output = canvasRef.current
     let cancelled = false
@@ -160,6 +160,8 @@ export function useVirtualBackground({
     let lastFaceLandmarks: NormalizedLandmark[] | null = null
     let lastFaceDetection = 0
     let lastFaceSeen = 0
+    let lastSegmentation = 0
+    let hasSegmentationMask = false
 
     const stopPipeline = () => {
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
@@ -208,6 +210,9 @@ export function useVirtualBackground({
         if (cancelled) return
 
         const mobile = window.matchMedia('(max-width: 620px)').matches
+        const renderInterval = 1000 / 30
+        const faceDetectionInterval = mobile ? 125 : 100
+        const segmentationInterval = mobile ? 125 : 100
         let [width, height] = ratioDimensions[ratio]
         if (mobile) { width = Math.round(width * 2 / 3); height = Math.round(height * 2 / 3) }
         output.width = width
@@ -257,7 +262,7 @@ export function useVirtualBackground({
         const effectFilter = () => { const current = effectsRef.current; return `brightness(${current.brightness}%) contrast(${current.contrast}%) saturate(${current.saturation}%) sepia(${Math.abs(current.temperature) * 0.25}%) hue-rotate(${current.temperature < 0 ? current.temperature * 0.35 : current.temperature * -0.18}deg)` }
         const updateFaceMask = (now: number) => {
           if (!hasRetouch || !faceLandmarkerRef.current) return
-          if (now - lastFaceDetection >= 100) {
+          if (now - lastFaceDetection >= faceDetectionInterval) {
             lastFaceDetection = now
             try {
               const detected = faceLandmarkerRef.current.detectForVideo(sourceCanvas!, now).faceLandmarks[0]
@@ -372,13 +377,34 @@ export function useVirtualBackground({
 
         const labels = segmenterRef.current?.getLabels() || []
         const labeledPersonIndex = labels.findIndex((label) => /person/i.test(label))
+        const drawSegmentedFrame = () => {
+          if (!hasSegmentationMask) {
+            outputContext.clearRect(0, 0, width, height)
+            outputContext.save()
+            outputContext.filter = effectFilter()
+            outputContext.drawImage(sourceCanvas!, 0, 0)
+            outputContext.restore()
+            return
+          }
+          drawBackground()
+          personContext.clearRect(0, 0, width, height)
+          personContext.globalCompositeOperation = 'source-over'
+          personContext.filter = effectFilter()
+          personContext.drawImage(sourceCanvas!, 0, 0)
+          personContext.filter = 'none'
+          personContext.globalCompositeOperation = 'destination-in'
+          personContext.filter = 'blur(1.5px)'
+          personContext.drawImage(maskCanvas!, 0, 0, width, height)
+          personContext.filter = 'none'
+          personContext.globalCompositeOperation = 'source-over'
+          outputContext.drawImage(personCanvas!, 0, 0)
+        }
         const frame = (now: number) => {
           if (cancelled || (needsSegmentation && !segmenterRef.current) || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || !video.videoWidth) {
             rafRef.current = requestAnimationFrame(frame)
             return
           }
-          if (!busyRef.current && now - lastFrameRef.current >= 50) {
-            busyRef.current = true
+          if (now - lastFrameRef.current >= renderInterval) {
             lastFrameRef.current = now
             sourceContext.clearRect(0, 0, width, height)
             drawCover(sourceContext, video, video.videoWidth, video.videoHeight, width, height)
@@ -391,36 +417,23 @@ export function useVirtualBackground({
               applyFaceRetouch(now)
               drawText()
               drawCaption()
-              busyRef.current = false
-              rafRef.current = requestAnimationFrame(frame)
-              return
-            }
-            try {
-              segmenterRef.current!.segmentForVideo(sourceCanvas!, now, (result) => {
-                const masks = result.confidenceMasks
-                const mask = labeledPersonIndex >= 0 ? masks?.[labeledPersonIndex] : masks?.[masks.length - 1]
-                if (mask && !cancelled) {
-                  maskToCanvas(mask, maskContext)
-                  drawBackground()
-                  personContext.clearRect(0, 0, width, height)
-                  personContext.globalCompositeOperation = 'source-over'
-                  personContext.filter = effectFilter()
-                  personContext.drawImage(sourceCanvas!, 0, 0)
-                  personContext.filter = 'none'
-                  personContext.globalCompositeOperation = 'destination-in'
-                  personContext.filter = 'blur(1.5px)'
-                  personContext.drawImage(maskCanvas!, 0, 0, width, height)
-                  personContext.filter = 'none'
-                  personContext.globalCompositeOperation = 'source-over'
-                  outputContext.drawImage(personCanvas!, 0, 0)
-                  applyFaceRetouch(now)
-                  drawText()
-                  drawCaption()
-                }
-                busyRef.current = false
-              })
-            } catch {
-              busyRef.current = false
+            } else {
+              drawSegmentedFrame()
+              applyFaceRetouch(now)
+              drawText()
+              drawCaption()
+              if (!busyRef.current && now - lastSegmentation >= segmentationInterval) {
+                busyRef.current = true
+                lastSegmentation = now
+                try {
+                  segmenterRef.current!.segmentForVideo(sourceCanvas!, now, (result) => {
+                    const masks = result.confidenceMasks
+                    const mask = labeledPersonIndex >= 0 ? masks?.[labeledPersonIndex] : masks?.[masks.length - 1]
+                    if (mask && !cancelled) { maskToCanvas(mask, maskContext); hasSegmentationMask = true }
+                    busyRef.current = false
+                  })
+                } catch { busyRef.current = false }
+              }
             }
           }
           rafRef.current = requestAnimationFrame(frame)
@@ -441,7 +454,7 @@ export function useVirtualBackground({
 
     void start()
     return () => { cancelled = true; stopPipeline() }
-  }, [background, cameraStream, canvasRef, effects.retouchEnabled, onProcessedStream, onUnsupported, processingActive, ratio, videoRef])
+  }, [background, cameraStream, canvasRef, effects.retouchEnabled, needsCanvasComposition, onProcessedStream, onUnsupported, ratio, videoRef])
 
   useEffect(() => () => {
     segmenterRef.current?.close()
@@ -450,5 +463,5 @@ export function useVirtualBackground({
     faceLandmarkerRef.current = null
   }, [])
 
-  return { status, active: processingActive }
+  return { status, active: needsCanvasComposition }
 }
